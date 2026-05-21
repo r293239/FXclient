@@ -1,4 +1,4 @@
-// FX Client Map Converter - All-in-one
+// FX Client Map Converter - All-in-one (Fixed)
 (function() {
     'use strict';
 
@@ -84,33 +84,45 @@
         }
     }
 
-    // ==================== UI MODAL ====================
-    function showMapUploader() {
-        // Remove existing if any
+    // ==================== CREATE BUTTON ====================
+    function createButton() {
+        var btn = document.createElement('div');
+        btn.textContent = '🗺️ Map';
+        btn.id = 'fxMapBtn';
+        btn.style.cssText = 'position:fixed!important;bottom:20px!important;right:20px!important;z-index:99999!important;padding:14px 22px!important;background:#4CAF50!important;color:#fff!important;border:none!important;border-radius:10px!important;font-size:18px!important;cursor:pointer!important;font-weight:bold!important;box-shadow:0 6px 20px rgba(0,0,0,0.5)!important;display:block!important;visibility:visible!important;opacity:1!important;font-family:sans-serif!important';
+        btn.onclick = showModal;
+        document.body.appendChild(btn);
+    }
+
+    // ==================== SHOW MODAL ====================
+    function showModal() {
         var existing = document.getElementById('fxMapModal');
-        if (existing) existing.remove();
+        if (existing) { existing.remove(); return; }
 
         var modal = document.createElement('div');
         modal.id = 'fxMapModal';
         modal.innerHTML = 
-            '<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:99999;background:#1a1a2e;border-radius:16px;padding:24px;color:#fff;border:2px solid #4CAF50;min-width:320px;max-width:90vw;box-shadow:0 0 40px rgba(76,175,80,0.3)">' +
-                '<h2 style="margin:0 0 16px;text-align:center">🗺️ Custom Map Upload</h2>' +
+            '<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:99999;background:#1a1a2e;border-radius:16px;padding:24px;color:#fff;border:2px solid #4CAF50;min-width:320px;max-width:90vw;box-shadow:0 0 40px rgba(76,175,80,0.3);font-family:sans-serif">' +
+                '<h2 style="margin:0 0 16px;text-align:center">🗺️ Custom Map</h2>' +
                 '<div id="fxDropZone" style="border:2px dashed #4CAF50;border-radius:8px;padding:30px;text-align:center;cursor:pointer;background:rgba(76,175,80,0.05)">' +
                     '<p style="margin:0;font-size:16px">Drop PNG here or tap to select</p>' +
                     '<input type="file" id="fxMapFile" accept=".png" hidden>' +
                 '</div>' +
                 '<button id="fxConvertBtn" style="display:none;width:100%;margin-top:12px;padding:12px;background:#4CAF50;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;font-weight:bold">Convert Map</button>' +
                 '<canvas id="fxPreview" style="display:none;width:100%;margin-top:12px;border-radius:4px;image-rendering:pixelated;border:1px solid #444"></canvas>' +
+                '<div id="fxUseMapBtns" style="display:none;margin-top:12px">' +
+                    '<p style="margin:0 0 8px;color:#aaa;font-size:14px">To use this map: Start a singleplayer game, then click below</p>' +
+                    '<button id="fxInjectMap" style="width:100%;padding:12px;background:#FF9800;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;font-weight:bold">🎮 Inject Map Into Game</button>' +
+                '</div>' +
                 '<button id="fxCloseBtn" style="width:100%;margin-top:12px;padding:10px;background:#444;color:#fff;border:none;border-radius:8px;cursor:pointer">Close</button>' +
             '</div>';
         document.body.appendChild(modal);
 
         var converter = new TerritorialMapConverter();
         var selectedFile = null;
+        var convertedGrid = null;
 
-        document.getElementById('fxDropZone').onclick = function() {
-            document.getElementById('fxMapFile').click();
-        };
+        document.getElementById('fxDropZone').onclick = function() { document.getElementById('fxMapFile').click(); };
         document.getElementById('fxDropZone').ondragover = function(e) { e.preventDefault(); };
         document.getElementById('fxDropZone').ondrop = function(e) {
             e.preventDefault();
@@ -133,30 +145,55 @@
             document.getElementById('fxConvertBtn').disabled = true;
             try {
                 var result = await converter.convert(selectedFile);
+                convertedGrid = result.grid;
                 var preview = document.getElementById('fxPreview');
                 preview.width = result.preview.width;
                 preview.height = result.preview.height;
                 preview.getContext('2d').drawImage(result.preview, 0, 0);
                 preview.style.display = 'block';
                 document.getElementById('fxConvertBtn').textContent = '✅ Done!';
-                console.log('Map converted:', result.dimensions.width + 'x' + result.dimensions.height);
+                document.getElementById('fxUseMapBtns').style.display = 'block';
             } catch(err) {
                 document.getElementById('fxConvertBtn').textContent = '❌ Error - Try Again';
                 document.getElementById('fxConvertBtn').disabled = false;
                 console.error(err);
             }
         };
-        document.getElementById('fxCloseBtn').onclick = function() {
-            modal.remove();
+        document.getElementById('fxInjectMap').onclick = function() {
+            if (convertedGrid) {
+                injectMapIntoGame(convertedGrid);
+                modal.remove();
+            }
         };
+        document.getElementById('fxCloseBtn').onclick = function() { modal.remove(); };
     }
 
-    // ==================== ADD BUTTON ====================
-    var btn = document.createElement('button');
-    btn.textContent = '🗺️ Map';
-    btn.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9998;padding:12px 20px;background:#4CAF50;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;font-weight:bold;box-shadow:0 4px 12px rgba(0,0,0,0.4)';
-    btn.onclick = showMapUploader;
-    document.body.appendChild(btn);
+    // ==================== INJECT INTO GAME ====================
+    function injectMapIntoGame(grid) {
+        // Try to find the game's map data
+        // This is experimental - Territorial.io stores map data in various places
+        console.log('Attempting to inject map...');
+        console.log('Grid size:', grid.length, 'x', grid[0].length);
+        
+        // Store in global scope so game patches can access it
+        window.__fxCustomMap = grid;
+        
+        // Try to find and override the game's map generation
+        if (window.game && window.game.map) {
+            console.log('Found game.map, attempting override...');
+            // This is a placeholder - actual implementation depends on game internals
+        }
+        
+        alert('Custom map stored! To use it:\n\n1. The map data is saved in window.__fxCustomMap\n2. FX Client developers can add a patch to use this data\n3. Current workaround: Start a game and the map is available for the patch system');
+    }
+
+    // ==================== INIT ====================
+    // Wait for body to be ready
+    if (document.body) {
+        createButton();
+    } else {
+        document.addEventListener('DOMContentLoaded', createButton);
+    }
 
     console.log('✅ Map Converter ready! Click the 🗺️ Map button.');
 })();
