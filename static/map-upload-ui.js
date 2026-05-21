@@ -1,15 +1,15 @@
 // map-upload-ui.js - UI Component for map upload
-import TerritorialMapConverter from './map-converter.js';
 
 class MapUploadUI {
     constructor() {
         this.converter = new TerritorialMapConverter();
         this.container = null;
+        this.selectedFile = null;
+        this.mapResult = null;
         this.createUI();
     }
 
     createUI() {
-        // Create the upload interface
         this.container = document.createElement('div');
         this.container.className = 'map-upload-container';
         this.container.innerHTML = `
@@ -64,9 +64,8 @@ class MapUploadUI {
         const dropZone = this.container.querySelector('#mapDropZone');
         const fileInput = this.container.querySelector('#mapFileInput');
 
-        // Drag and drop handlers
         dropZone.addEventListener('click', () => fileInput.click());
-        
+
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropZone.classList.add('dragover');
@@ -88,7 +87,6 @@ class MapUploadUI {
             if (file) this.handleFileSelect(file);
         });
 
-        // Button handlers
         this.container.querySelector('#convertMapBtn').addEventListener('click', () => {
             this.convertMap();
         });
@@ -108,16 +106,10 @@ class MapUploadUI {
 
     async handleFileSelect(file) {
         try {
-            // Show settings panel
             this.container.querySelector('#settingsPanel').style.display = 'block';
-            
-            // Store file for later conversion
             this.selectedFile = file;
-            
-            // Update drop zone text
             const dropZone = this.container.querySelector('#mapDropZone');
             dropZone.querySelector('p').textContent = `Selected: ${file.name}`;
-            
         } catch (error) {
             console.error('Error handling file:', error);
             alert('Error loading file. Please make sure it is a valid PNG.');
@@ -134,39 +126,35 @@ class MapUploadUI {
         progressBar.style.display = 'block';
 
         try {
-            // Update settings from UI
             this.converter.config.minIslandSize = parseInt(
                 this.container.querySelector('#minIslandSize').value
             );
             this.converter.config.minLakeSize = parseInt(
                 this.container.querySelector('#minLakeSize').value
             );
-            this.converter.config.normalize = 
+            this.converter.config.normalize =
                 this.container.querySelector('#normalizeMap').checked;
 
-            // Convert
             const result = await this.converter.convert(this.selectedFile);
-            
-            // Store result
+
             this.mapResult = result;
 
-            // Show preview
             const previewPanel = this.container.querySelector('#previewPanel');
             const previewCanvas = this.container.querySelector('#mapPreview');
             const mapInfo = this.container.querySelector('#mapInfo');
-            
+
             previewCanvas.width = result.preview.width;
             previewCanvas.height = result.preview.height;
             const ctx = previewCanvas.getContext('2d');
             ctx.drawImage(result.preview, 0, 0);
-            
+
             mapInfo.innerHTML = `
                 Dimensions: ${result.dimensions.width}x${result.dimensions.height}<br>
                 Data size: ${result.mapData.length} bytes
             `;
-            
+
             previewPanel.style.display = 'block';
-            
+
         } catch (error) {
             console.error('Conversion error:', error);
             alert('Error converting map: ' + error.message);
@@ -177,7 +165,7 @@ class MapUploadUI {
 
     downloadMapData() {
         if (!this.mapResult) return;
-        
+
         const blob = new Blob([this.mapResult.mapData], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -189,7 +177,7 @@ class MapUploadUI {
 
     copyToClipboard() {
         if (!this.mapResult) return;
-        
+
         navigator.clipboard.writeText(this.mapResult.mapData).then(() => {
             alert('Map data copied to clipboard!');
         });
@@ -200,7 +188,7 @@ class MapUploadUI {
         this.mapResult = null;
         this.container.querySelector('#previewPanel').style.display = 'none';
         this.container.querySelector('#settingsPanel').style.display = 'none';
-        this.container.querySelector('#mapDropZone').querySelector('p').textContent = 
+        this.container.querySelector('#mapDropZone').querySelector('p').textContent =
             'Drop PNG here or click to upload';
     }
 
@@ -210,13 +198,21 @@ class MapUploadUI {
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 max-width: 600px;
                 margin: 20px auto;
+                position: relative;
+                z-index: 99999;
             }
             .map-upload-panel {
-                background: rgba(30, 30, 30, 0.9);
+                background: rgba(30, 30, 30, 0.95);
                 border-radius: 12px;
                 padding: 24px;
                 color: #e0e0e0;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+                border: 1px solid #444;
+            }
+            .map-upload-panel h3 {
+                margin-top: 0;
+                color: #fff;
+                text-align: center;
             }
             .upload-zone {
                 border: 2px dashed #555;
@@ -226,6 +222,7 @@ class MapUploadUI {
                 cursor: pointer;
                 transition: all 0.3s;
                 margin: 16px 0;
+                background: rgba(255,255,255,0.02);
             }
             .upload-zone:hover, .upload-zone.dragover {
                 border-color: #4CAF50;
@@ -246,9 +243,14 @@ class MapUploadUI {
                 background: rgba(255,255,255,0.05);
                 border-radius: 8px;
             }
+            .settings-panel h4, .preview-panel h4 {
+                margin-top: 0;
+                color: #ccc;
+            }
             .settings-panel label {
                 display: block;
                 margin: 8px 0;
+                color: #bbb;
             }
             .settings-panel input[type="number"] {
                 width: 80px;
@@ -259,8 +261,11 @@ class MapUploadUI {
                 color: #fff;
                 margin-left: 8px;
             }
+            .settings-panel input[type="checkbox"] {
+                margin-right: 8px;
+            }
             .primary-btn, .action-buttons button {
-                padding: 8px 16px;
+                padding: 10px 16px;
                 border: none;
                 border-radius: 6px;
                 cursor: pointer;
@@ -273,13 +278,22 @@ class MapUploadUI {
                 color: white;
                 width: 100%;
                 margin-top: 12px;
+                font-weight: bold;
             }
             .primary-btn:hover {
                 background: #45a049;
             }
+            .action-buttons {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+                margin-top: 12px;
+            }
             .action-buttons button {
                 background: #2196F3;
                 color: white;
+                flex: 1;
+                min-width: 100px;
             }
             .action-buttons button:hover {
                 background: #1976D2;
@@ -288,6 +302,7 @@ class MapUploadUI {
                 width: 100%;
                 border-radius: 4px;
                 image-rendering: pixelated;
+                border: 1px solid #555;
             }
             .map-info {
                 font-size: 14px;
@@ -323,5 +338,3 @@ class MapUploadUI {
         parentElement.appendChild(this.container);
     }
 }
-
-export default MapUploadUI;
